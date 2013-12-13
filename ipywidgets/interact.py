@@ -135,7 +135,7 @@ class StaticBuildFigure(object):
       ax.set_xlim(left=0, right=1)
       ax.set_ylim(bottom=0, top=5)
 
-    ipywidgets.interact.StaticBuildFigure([f1, f2], apply_to_all=init)
+    StaticBuildFigure([f1, f2], apply_to_all=init)
     """
     template = """
     <style>
