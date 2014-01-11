@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from IPython import get_ipython
 
 
-def _get_html(obj):
+def _get_html(obj, center=False):
     """Get the HTML representation of an object"""
     # TODO: use displaypub to make this more general
     ip = get_ipython()
@@ -20,8 +20,11 @@ def _get_html(obj):
     if png_rep is not None:
         if isinstance(obj, plt.Figure):
             plt.close(obj)  # keep from displaying twice
-        return ('<img src="data:image/png;'
-                'base64,{0}">'.format(png_rep.encode('base64')))
+        output = ('<img src="data:image/png;'
+                  'base64,{0}">'.format(png_rep.encode('base64')))
+        if center:
+            return "<center>{0}</center>".format(output)
+        else: return output
     else:
         return "<p> {0} </p>".format(str(obj))
 
@@ -201,7 +204,7 @@ class StaticBuildFigure(object):
     </div>
     """
 
-    def __init__(self, function_list, apply_to_all=None):
+    def __init__(self, function_list, apply_to_all=None, center=False):
         """
         StaticBuildFigure(function_list, apply_to_all=None)
         function_list: list of functions. Each function must take in
@@ -215,6 +218,7 @@ class StaticBuildFigure(object):
         """
         self.function_list = function_list
         self.apply_to_all = apply_to_all
+        self.center = center
         
     def GenerateFigure(self, i):
         """
@@ -241,7 +245,7 @@ class StaticBuildFigure(object):
         tmplt = self.subdiv_template
         return "".join(tmplt.format(name=divname,
                                     display="block" if disp else "none",
-                                    content=_get_html(result))
+                                    content=_get_html(result, center=self.center))
                        for divname, result, disp in zip(divnames,
                                                         results,
                                                         display))
