@@ -3,8 +3,7 @@ import itertools
 import matplotlib.pyplot as plt
 from IPython import get_ipython
 
-
-def _get_html(obj, center=False):
+def _get_html(obj):
     """Get the HTML representation of an object"""
     # TODO: use displaypub to make this more general
     ip = get_ipython()
@@ -22,9 +21,7 @@ def _get_html(obj, center=False):
             plt.close(obj)  # keep from displaying twice
         output = ('<img src="data:image/png;'
                   'base64,{0}">'.format(png_rep.encode('base64')))
-        if center:
-            return "<center>{0}</center>".format(output)
-        else: return output
+        return output
     else:
         return "<p> {0} </p>".format(str(obj))
 
@@ -120,25 +117,11 @@ class StaticInteract(object):
         
     def _repr_html_(self):
         return self.html()
-        
-class StaticBuildFigure(object):
+
+class StaticBuildObject(object):
     """
-    Make build figures, useful for presentations.
-
-    Example:
-    def f1(ax):
-      ax.axhline(y=2)
-
-    def f2(ax):
-      ax.axhline(y=3)
-    
-    def init(ax):
-      ax.set_xlabel("This is the X axis")
-      ax.set_ylabel("This is the Y axis")
-      ax.set_xlim(left=0, right=1)
-      ax.set_ylim(bottom=0, top=5)
-
-    StaticBuildFigure([f1, f2], apply_to_all=init)
+    Make build objects, useful for presentations
+    Extended by StaticBuildFigure and StaticBuildTable
     """
     template = """
     <style>
@@ -203,42 +186,21 @@ class StaticBuildFigure(object):
       {content}
     </div>
     """
-
     def __init__(self, function_list, apply_to_all=None, center=False, rightclick=False):
-        """
-        StaticBuildFigure(function_list, apply_to_all=None)
-        function_list: list of functions. Each function must take in
-          a pyplot.Axes instance and modify that axis
-        apply_to_all: apply this function to all plots
-        center: center the output html
-        rightclick: change the figure on right click instead of click
-
-        Generate "build" figures, progressively applying functions in
-          the list. Each time you right click on the figure, apply the next
-          function. Press "a" (advance) or "r" (reverse) to 
-          move forward and backward through the animation
-        """
         self.function_list = function_list
         self.apply_to_all = apply_to_all
         self.center = center
         self.rightclick = rightclick
-        
-    def GenerateFigure(self, i):
-        """
-        Generate figure after applying the first i functions
-        """
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        for f in self.function_list[0:i]:
-            f(ax)
-        if self.apply_to_all is not None: self.apply_to_all(ax)
-        return fig
+
+    def GenerateStaticFrames(self):
+        """ overridden by children classes """
+        return None
 
     def _output_html(self):
         # get results
         results = []
         for i in range(len(self.function_list)+1):
-            results.append(self.GenerateFigure(i))
+            results.append(self.GenerateStaticFrames(i))
         
         # Get divnames (name<i> is after applying first i functions)
         divnames = ['name%s'%i for i in range(len(self.function_list)+1)]
@@ -248,7 +210,7 @@ class StaticBuildFigure(object):
         tmplt = self.subdiv_template
         return "".join(tmplt.format(name=divname,
                                     display="block" if disp else "none",
-                                    content=_get_html(result, center=self.center))
+                                    content=_get_html(result))
                        for divname, result, disp in zip(divnames,
                                                         results,
                                                         display))
@@ -261,4 +223,67 @@ class StaticBuildFigure(object):
         return self.template.format(outputs=self._output_html(), clicktype=self._get_clicktype())
 
     def _repr_html_(self):
+        if self.center:
+            return "<center>{0}</center>".format(self.html())
         return self.html()
+
+class StaticBuildTable(StaticBuildObject):
+    """
+    Make build tables, useful for presentations
+    """
+
+    def __init__(self, pretty_table, function_list, center=False, rightclick=False):
+        self.function_list = function_list
+        self.pretty_table = pretty_table
+        self.center = center
+        self.rightclick = rightclick
+
+    def GenerateStaticFrames(self, i):
+        pt = self.pretty_table.copy()
+        for f in self.function_list[0:i]:
+            f(pt)
+        return pt
+
+class StaticBuildFigure(StaticBuildObject):
+    """
+    Make build figures, useful for presentations.
+
+    StaticBuildFigure(function_list, apply_to_all=None)
+    function_list: list of functions. Each function must take in
+      a pyplot.Axes instance and modify that axis
+    apply_to_all: apply this function to all plots
+    center: center the output html
+    rightclick: change the figure on right click instead of click
+
+    Generate "build" figures, progressively applying functions in
+      the list. Each time you right click on the figure, apply the next
+      function. Press "a" (advance) or "r" (reverse) to 
+      move forward and backward through the animation
+
+    Example:
+    def f1(ax):
+      ax.axhline(y=2)
+
+    def f2(ax):
+      ax.axhline(y=3)
+    
+    def init(ax):
+      ax.set_xlabel("This is the X axis")
+      ax.set_ylabel("This is the Y axis")
+      ax.set_xlim(left=0, right=1)
+      ax.set_ylim(bottom=0, top=5)
+
+    StaticBuildFigure([f1, f2], apply_to_all=init)
+    """
+        
+    def GenerateStaticFrames(self, i):
+        """
+        Generate figure after applying the first i functions
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        for f in self.function_list[0:i]:
+            f(ax)
+        if self.apply_to_all is not None: self.apply_to_all(ax)
+        return fig
+
