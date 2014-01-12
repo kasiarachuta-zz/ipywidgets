@@ -192,7 +192,7 @@ class StaticBuildFigure(object):
     }}
     }}
     </script>
-    <div name="control" onclick="ProgressForward(this.parentNode);" onkeyup="HandleKey(this.parentNode);" tabindex="0">
+    <div name="control" {clicktype}="ProgressForward(this.parentNode);return false;" onkeyup="HandleKey(this.parentNode);" tabindex="0">
       {outputs}
       <input type="none" value="0" style="display:none;">
     </div>
@@ -204,21 +204,24 @@ class StaticBuildFigure(object):
     </div>
     """
 
-    def __init__(self, function_list, apply_to_all=None, center=False):
+    def __init__(self, function_list, apply_to_all=None, center=False, rightclick=False):
         """
         StaticBuildFigure(function_list, apply_to_all=None)
         function_list: list of functions. Each function must take in
           a pyplot.Axes instance and modify that axis
         apply_to_all: apply this function to all plots
+        center: center the output html
+        rightclick: change the figure on right click instead of click
 
         Generate "build" figures, progressively applying functions in
-          the list. Each time you click on the figure, apply the next
+          the list. Each time you right click on the figure, apply the next
           function. Press "a" (advance) or "r" (reverse) to 
           move forward and backward through the animation
         """
         self.function_list = function_list
         self.apply_to_all = apply_to_all
         self.center = center
+        self.rightclick = rightclick
         
     def GenerateFigure(self, i):
         """
@@ -250,8 +253,12 @@ class StaticBuildFigure(object):
                                                         results,
                                                         display))
 
+    def _get_clicktype(self):
+        if self.rightclick: return "oncontextmenu"
+        else: return "onclick"
+
     def html(self):
-        return self.template.format(outputs=self._output_html())
+        return self.template.format(outputs=self._output_html(), clicktype=self._get_clicktype())
 
     def _repr_html_(self):
         return self.html()
