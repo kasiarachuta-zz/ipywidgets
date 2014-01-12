@@ -47,7 +47,10 @@ class CellStyle(object):
 
     def column_format(self, x):
         if self.format_function is None: return str(x)
-        else: return self.format_function(x)
+        else:
+            try:
+                return self.format_function(x)
+            except: return str(x)
 
     def copy(self):
         c = CellStyle()
@@ -262,9 +265,10 @@ class PrettyTable(object):
 
     def copy(self):
         p = PrettyTable(self.df, self.style, self.header_row, self.header_col)
-        p.header_row_styles = list(self.header_row_styles)
-        p.header_col_styles = list(self.header_col_styles)
-        p.cell_styles = [list(item) for item in self.cell_styles]
+        p.header_row_styles = [item.copy() for item in self.header_row_styles]
+        p.header_col_styles = [item.copy() for item in self.header_col_styles]
+        p.cell_styles = [[self.cell_styles[i][j].copy() for j in range(self.num_cols)] for i in range(self.num_rows)]
+        p.corner_style = self.corner_style.copy()
         p.center = self.center
         return p
 
