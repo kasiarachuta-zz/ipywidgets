@@ -1,4 +1,5 @@
 import pandas
+import numpy
 
 class TableStyle(object):
     """
@@ -23,9 +24,8 @@ class TableStyle(object):
             self.row_head_style.color = "black"
             self.col_head_style.font_weight = "bold"
             self.row_head_style.font_weight = "bold"
-            self.col_head_style.background_color = "gray"
-            self.row_head_style.background_color = "gray"
-            self.corner_style.background_color = "red"
+            self.col_head_style.background_color = "lightgray"
+            self.row_head_style.background_color = "lightgray"
 
 class CellStyle(object):
     """
@@ -45,6 +45,10 @@ class CellStyle(object):
         self.font_style = None
         self.font_weight = None
         self.font = None
+
+        # format functions - add types as needed
+        self.float_format_function = lambda x: "%0.4f"%x
+        self.sci_notation_function = lambda x: "%0.2E"%x
 
     def css(self):
         style = ""
@@ -72,17 +76,13 @@ class CellStyle(object):
             style += "font: %s;"%self.font
         return style
 
-    # Individual elements, may override later
-    def table_css(self):
-        return self.css()
-
-    def row_css(self):
-        return self.css()
-
-    def column_css(self):
-        return self.css()
-
     def column_format(self, x):
+        if type(x) == float or type(x) == numpy.float64:
+            if x < 0.0001:
+                xx =  self.sci_notation_function(x)
+                base, exp = xx.split("E")
+                return "%s &times; 10<sup>%s</sup>"%(base, exp)
+            else: return self.float_format_function(x)
         return str(x)
 
 class PrettyTable(object):
@@ -90,7 +90,7 @@ class PrettyTable(object):
     Formatted tables for display in IPython notebooks
     """
 
-    def __init__(self, df, style=None, header_row=False, header_col=False):
+    def __init__(self, df, style=None, header_row=False, header_col=False, center=False):
         """
         df: pandas.DataFrame
         style: TableStyle
@@ -103,13 +103,14 @@ class PrettyTable(object):
         self.header_row = header_row
         self.header_col = header_col
         self.style = style
+        self.center = center
 
         # overall table style
         if style is None:
             self.cell_style = CellStyle()
             self.corner_style = CellStyle()
-            self.header_row_styles = [None for i in range(len(self.num_rows))]
-            self.header_col_styles = [None for i in range(len(self.num_cols))]
+            self.header_row_styles = [CellStyle() for i in range(self.num_rows)]
+            self.header_col_styles = [CellStyle() for i in range(self.num_cols)]
         else:
             self.cell_style = style.cell_style
             self.corner_style = style.corner_style
@@ -155,47 +156,49 @@ class PrettyTable(object):
         IPython display protocol calls this method to get the
         HTML representation of the object
         """
-        html = "<table style=\"%s\">"%self.cell_style.table_css()
+        html = "<table style=\"%s\">"%self.cell_style.css()
         if self.header_col:
-            html += "<tr style=\"%s\">"%self.cell_style.row_css()
+            html += "<tr style=\"%s\">"%self.cell_style.css()
             if self.header_row:
                 # need to add an extra empty cell
                 html += "<td style=\"%s\"></td>"%self.corner_style.css()
             for j in range(self.num_cols):
                 if self.header_col_styles is not None:
-                    header_style = self.header_col_styles[j].column_css()
-                else: header_style = self.cell_style.column_css()
+                    header_style = self.header_col_styles[j].css()
+                else: header_style = self.cell_style.css()
                 html += "<td style=\"%s\">"%header_style
                 html += self.df.columns[j]
                 html += "</td>"
             html += "</tr>"
         for i in range(self.num_rows):
-            html += "<tr style=\"%s\">"%self.cell_style.row_css()
+            html += "<tr style=\"%s\">"%self.cell_style.css()
             if self.header_row:
                 if self.header_row_styles is not None:
-                    header_style = self.header_row_styles[i].column_css()
-                else: header_style = self.cell_style.column_css()
+                    header_style = self.header_row_styles[i].css()
+                else: header_style = self.cell_style.css()
                 html += "<td style=\"%s\">"%header_style
                 html += str(self.df.index.values[i])
                 html += "</td>"
             for j in range(self.num_cols):
                 if self.cell_styles[i][j] is not None:
-                    col_style = self.cell_styles[i][j].column_css()
+                    col_style = self.cell_styles[i][j].css()
                     col_data = self.cell_styles[i][j].column_format(self.df.iloc[i,j])
                 else:
-                    col_style = self.cell_style.column_css()
+                    col_style = self.cell_style.css()
                     col_data = self.cell_style.column_format(self.df.iloc[i,j])
                 html += "<td style=\"%s\">"%col_style
                 html += col_data
                 html += "</td>"
             html += "</tr>"
         html += "</table>"
-        return html
+        if self.center: return "<center>{0}</center>".format(html)
+        else: return html
 
     def copy(self):
         p = PrettyTable(self.df, self.style, self.header_row, self.header_col)
         p.header_row_styles = list(self.header_row_styles)
         p.header_col_styles = list(self.header_col_styles)
         p.cell_styles = [list(item) for item in self.cell_styles]
+        p.center = self.center
         return p
 
