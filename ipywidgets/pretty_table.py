@@ -13,19 +13,19 @@ class TableStyle(object):
 
         # add themes as needed
         if theme == "basic":
-            self.cell_style.border = "1px solid black"
-            self.col_head_style.font_weight = "bold"
-            self.row_head_style.font_weight = "bold"
+            self.cell_style.set("border", "1px solid black")
+            self.col_head_style.set("font-weight", "bold")
+            self.row_head_style.set("font-weight", "bold")
 
         if theme == "theme1":
-            self.cell_style.border = "1px solid black"
-            self.cell_style.color = "black"
-            self.col_head_style.color = "black"
-            self.row_head_style.color = "black"
-            self.col_head_style.font_weight = "bold"
-            self.row_head_style.font_weight = "bold"
-            self.col_head_style.background_color = "lightgray"
-            self.row_head_style.background_color = "lightgray"
+            self.cell_style.set("border", "1px solid black")
+            self.cell_style.set("color", "black")
+            self.col_head_style.set("color", "black")
+            self.row_head_style.set("color", "black")
+            self.col_head_style.set("font-weight", "bold")
+            self.row_head_style.set("font_weight", "bold")
+            self.col_head_style.set("background-color", "lightgray")
+            self.row_head_style.set("background-color", "lightgray")
 
 class CellStyle(object):
     """
@@ -33,64 +33,34 @@ class CellStyle(object):
     """
     
     def __init__(self):
-        # add CSS features as needed
-        self.background_color = None
-        self.border_collapse = None
-        self.border_color = None
-        self.border_style = None
-        self.border = None
-        self.color = None
-        self.font_family = None
-        self.font_size = None
-        self.font_style = None
-        self.font_weight = None
-        self.font = None
+        self.style_elements = {} # dictionary of CSS property -> value
+        self.format_function = None
 
-        # format functions - add types as needed
-        self.float_format_function = lambda x: "%0.4f"%x
-        self.sci_notation_function = lambda x: "%0.2E"%x
+    def set(self, key, value):
+        self.style_elements[key] = value
 
     def css(self):
         style = ""
-        if self.background_color is not None:
-            style += "background-color: %s;"%self.background_color
-        if self.border_collapse is not None:
-            style += "border-collapse: %s;"%self.border_collapse
-        if self.border_color is not None:
-            style += "border-color: %s;"%self.border_color
-        if self.border_style is not None:
-            style += "border-style: %s;"%self.border_style
-        if self.border is not None:
-            style += "border: %s;"%self.border
-        if self.color is not None:
-            style += "color: %s;"%self.color
-        if self.font_family is not None:
-            style += "font-family: %s;"%self.font_family
-        if self.font_size is not None:
-            style += "font-size: %s;"%self.font_size
-        if self.font_style is not None:
-            style += "font-style: %s;"%self.font_style
-        if self.font_weight is not None:
-            style += "font-weight: %s;"%self.font_weight
-        if self.font is not None:
-            style += "font: %s;"%self.font
+        for key in self.style_elements:
+            style += "%s: %s;"%(key, self.style_elements[key])
         return style
 
     def column_format(self, x):
-        if type(x) == float or type(x) == numpy.float64:
-            if x < 0.0001:
-                xx =  self.sci_notation_function(x)
-                base, exp = xx.split("E")
-                return "%s &times; 10<sup>%s</sup>"%(base, exp)
-            else: return self.float_format_function(x)
-        return str(x)
+        if self.format_function is None: return str(x)
+        else: return self.format_function(x)
+
+    def copy(self):
+        c = CellStyle()
+        c.style_elements = self.style_elements.copy()
+        c.format_function = self.format_function
+        return c
 
 class PrettyTable(object):
     """
     Formatted tables for display in IPython notebooks
     """
 
-    def __init__(self, df, style=None, header_row=False, header_col=False, center=False):
+    def __init__(self, df, tstyle=None, header_row=False, header_col=True, center=False):
         """
         df: pandas.DataFrame
         style: TableStyle
@@ -102,54 +72,150 @@ class PrettyTable(object):
         self.num_cols = df.shape[1]
         self.header_row = header_row
         self.header_col = header_col
-        self.style = style
+        self.style = tstyle
         self.center = center
 
         # overall table style
-        if style is None:
+        if tstyle is None:
             self.cell_style = CellStyle()
             self.corner_style = CellStyle()
             self.header_row_styles = [CellStyle() for i in range(self.num_rows)]
             self.header_col_styles = [CellStyle() for i in range(self.num_cols)]
+            self.cell_styles = [[CellStyle() for i in range(self.num_cols)]\
+                                for j in range(self.num_rows)]
         else:
-            self.cell_style = style.cell_style
-            self.corner_style = style.corner_style
-            self.header_row_styles = [style.row_head_style for i in range(self.num_rows)]
-            self.header_col_styles = [style.col_head_style for i in range(self.num_cols)]
+            self.cell_style = tstyle.cell_style
+            self.corner_style = tstyle.corner_style
+            self.header_row_styles = [tstyle.row_head_style.copy() for i in range(self.num_rows)]
+            self.header_col_styles = [tstyle.col_head_style.copy() for i in range(self.num_cols)]
+            self.cell_styles = [[self.cell_style.copy() for i in range(self.num_cols)]\
+                                    for j in range(self.num_rows)]
 
-        # Individual cell styles, overrides overall style
-        self.cell_styles = [[None for i in range(self.num_cols)]\
-                            for j in range(self.num_rows)]
-
-    def set_cell_style(self, style, rows=None, cols=None):
+    # functions to set styles
+    def set_cell_style(self, style=None, rows=None, cols=None, format_function=None, **kwargs):
         """
         Apply cell style to rows and columns specified
+        """
+        if style is None: style = CellStyle()
+        for key, value in kwargs.iteritems():
+            k = key.replace("_", "-")
+            style.set(k, value)
+        if format_function is not None: style.format_function = format_function
+        if rows is None: rows = range(self.num_rows)
+        if cols is None: cols = range(self.num_cols)
+        for i in rows:
+            for j in cols:
+                self.cell_styles[i][j] = style.copy()
+
+    def set_row_header_style(self, style=None, indices=None, format_function=None, **kwargs):
+        """
+        Apply style to header at specific index
+        If index is None, apply to all headings
+        """
+        if style is None: style = CellStyle()
+        for key, value in kwargs.iteritems():
+            k = key.replace("_", "-")
+            style.set(k, value)
+        if format_function is not None: style.format_function = format_function
+        if indices is None: indices = range(self.num_rows)
+        for i in indices:
+            self.header_row_styles[i] = style.copy()
+
+    def set_col_header_style(self, style=None, indices=None, format_function=None, **kwargs):
+        """
+        Apply style to header at specific index
+        If index is None, apply to all headings
+        """
+        if indices is None: indices = range(self.num_cols)
+        if style is None: style = CellStyle()
+        if format_function is not None: style.format_function = format_function
+        for key, value in kwargs.iteritems():
+            k = key.replace("_", "-")
+            style.set(k, value)
+        for i in indices:
+            self.header_col_styles[i] = style.copy()
+
+    def set_corner_style(self, style=None, format_function=None, **kwargs):
+        """
+        Apply style to the corner cell
+        """
+        if style is None: style = CellStyle()
+        for key, value in kwargs.iteritems():
+            k = key.replace("_", "-")
+            style.set(k, value)
+        if format_function is not None: style.format_function = format_function
+        self.corner_style = style
+
+    # functions to update styles
+    def update_cell_style(self, rows=None, cols=None, format_function=None, **kwargs):
+        """
+        Update existing cell style
         """
         if rows is None: rows = range(self.num_rows)
         if cols is None: cols = range(self.num_cols)
         for i in rows:
             for j in cols:
-                self.cell_styles[i][j] = style
-    
-    def set_row_header_style(self, style, index=None):
-        """
-        Apply style to header at specific index
-        If index is None, apply to all headings
-        """
-        if index is not None:
-            self.header_row_styles[index] = style
-        else:
-            self.header_row_styles = [style for i in range(self.num_rows)]
+                style = self.cell_styles[i][j]
+                self.set_cell_style(style=style, rows=[i], cols=[j], format_function=format_function, **kwargs)
 
-    def set_col_header_style(self, style, index=None):
+    def update_row_header_style(self, indices=None, format_function=None, **kwargs):
         """
-        Apply style to header at specific index
-        If index is None, apply to all headings
+        Update existing row header tyle
         """
-        if index is not None:
-            self.header_col_styles[index] = style
-        else:
-            self.header_col_styles = [style for i in range(self.num_cols)]
+        if indices is None: indices = range(self.num_rows)
+        for i in indices:
+            style = self.header_row_styles[i]
+            self.set_row_header_style(style=style, indices=[i], format_function=format_function, **kwargs)
+
+    def update_col_header_style(self, indices=None, format_function=None, **kwargs):
+        """
+        Update existing row header tyle
+        """
+        if indices is None: indices = range(self.num_cols)
+        for i in indices:
+            style = self.header_col_styles[i]
+            self.set_col_header_style(style=style, indices=[i], format_function=format_function, **kwargs)
+
+    def update_corner_style(self, format_function=None, **kwargs):
+        """
+        Update the corner style
+        """
+        style = self.corner_style
+        self.set_corner_style(style=style, format_function=format_function, **kwargs)
+
+    # Functions to reset style
+    def reset_cell_style(self, rows=None, cols=None):
+        """
+        Reset existing cell style to defaults
+        """
+        if rows is None: rows = range(self.num_rows)
+        if cols is None: cols = range(self.num_cols)
+        for i in rows:
+            for j in cols:
+                self.set_cell_style(style=CellStyle(), rows=[i], cols=[j])
+
+    def reset_row_header_style(self, indices=None):
+        """
+        Reset row header style to defaults
+        """
+        if indices is None: indices = range(self.num_rows)
+        for i in indices:
+            self.set_row_header_style(style=CellStyle(), indices=[i])
+
+    def reset_col_header_style(self, indices=None):
+        """
+        Reset col header style to defaults
+        """
+        if indices is None: indices = range(self.num_cols)
+        for i in indices:
+            self.set_col_header_style(style=CellStyle(), indices=[i])
+
+    def reset_corner_style(self):
+        """
+        Reset corner style to defaults
+        """
+        style = self.corner_style
+        self.set_corner_style(style=CellStyle())
 
     def _repr_html_(self):
         """
