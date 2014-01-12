@@ -1,15 +1,12 @@
 ipywidgets
 ==========
+Forked from jakevdp/ipywidgets
+
 Static Widgets for IPython Notebooks
 
 This is currently an experimental repository containing code which enables
 static widgets to be used in the IPython notebook.
 
-Use at your own risk: the interface will likely change in the near future...
-
 Demonstrations
 --------------
-You can see this in action in a few places:
-
-- My [blog post](http://jakevdp.github.io/blog/2013/12/05/static-interactive-widgets/) about starting this repository
-- The [example notebook](http://nbviewer.ipython.org/github/jakevdp/ipywidgets/blob/master/example.ipynb) in this repository
+You can see the static build figures for presentations that I added on [my blog post](http://melissagymrek.com/python/2013/12/13/ipython-presentations-build-figures.html).
